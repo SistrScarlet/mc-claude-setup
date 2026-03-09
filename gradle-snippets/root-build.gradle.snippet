@@ -1,0 +1,48 @@
+// ============================================================
+// mc-claude-setup: root build.gradle に追加するブロック
+// ============================================================
+//
+// 前提: gradle.properties に以下のプロパティが追加済みであること
+//   gjf_version, checkstyle_version, spotless_version, spotbugs_version
+
+// --- plugins {} ブロックに追加 ---
+// id "com.diffplug.spotless" version "${spotless_version}" apply false
+// id "com.github.spotbugs" version "${spotbugs_version}" apply false
+
+// --- allprojects {} ブロック内に追加 ---
+    apply plugin: "com.diffplug.spotless"
+    apply plugin: "checkstyle"
+    apply plugin: "com.github.spotbugs"
+
+    checkstyle {
+        toolVersion = rootProject.checkstyle_version
+        configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+        // 違反があってもビルドを止めない
+        ignoreFailures = true
+        // メインソースのみチェック
+        sourceSets = [project.sourceSets.main]
+    }
+
+    spotbugs {
+        ignoreFailures = true
+        effort = com.github.spotbugs.snom.Effort.valueOf("DEFAULT")
+        reportLevel = com.github.spotbugs.snom.Confidence.valueOf("MEDIUM")
+        excludeFilter = rootProject.file("config/spotbugs/exclude.xml")
+    }
+
+    tasks.withType(com.github.spotbugs.snom.SpotBugsTask) {
+        reports {
+            html.required = true
+            xml.required = true
+        }
+    }
+
+    spotless {
+        java {
+            target "src/*/java/**/*.java"
+            googleJavaFormat(rootProject.gjf_version)
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+    }

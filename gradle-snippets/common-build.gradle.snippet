@@ -1,0 +1,15 @@
+// ============================================================
+// mc-claude-setup: common/build.gradle に追加するブロック
+// ============================================================
+//
+// 前提: gradle.properties に以下のプロパティが追加済みであること
+//   junit_version, junit_platform_version
+
+// --- dependencies {} ブロック内に追加 ---
+    testImplementation "org.junit.jupiter:junit-jupiter:${rootProject.junit_version}"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher:${rootProject.junit_platform_version}"
+
+// --- トップレベルに追加 ---
+test {
+    useJUnitPlatform()
+}
