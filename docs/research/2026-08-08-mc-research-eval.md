@@ -23,7 +23,7 @@ ede9d9c fix: サウンドパック選択時に声が鳴らない回帰を修正 
 6d3ebd3 fix: サウンドパック選択画面のUIが背景ブラーに巻き込まれる問題を修正
 ```
 
-root-cause doc (`docs/research/2026-07-11_soundpack-regression-root-cause.md`) は `4a1c875` で追加されているため、`ede9d9c~1 = 4a1c875` を使うと最初から答えが書かれた状態になる。brief 自身が「存在してしまう場合は…worktree の当該ファイルを確認し、答えが書いてあるファイルがあれば報告して指示を仰ぐこと」と指示していたケースに実際に該当した。
+root-cause doc (`docs/research/2026-07-11_soundpack-regression-root-cause.md`) は `4a1c875` で追加されているため、`ede9d9c~1 = 4a1c875` を使うと最初から答えが書かれた状態になる。brief にはこの「答えが書いてあるファイルが存在してしまう場合」の対応指示は無かったが、実装者 (eval オーケストレーター) の判断として、答えが露出するベースコミットを避けることにした。
 
 **対応**: 「root-cause doc が無く、かつ回帰も既に発生している」最小差分のコミットとして `b48caca` (`4a1c875` の直前) を採用した。確認済み:
 - `git show b48caca:docs/research/2026-07-11_soundpack-regression-root-cause.md` → 存在しない (fatal: path exists on disk, but not in 'b48caca')
@@ -31,7 +31,7 @@ root-cause doc (`docs/research/2026-07-11_soundpack-regression-root-cause.md`) �
 - `a2df84a` (回帰混入コミット) は `b48caca` の祖先 → 回帰は再現する
 - `LMSoundManager.java` の `getLocation()` override は `b48caca` 時点で既に無い (`new Sound(location, ...)` のみ) → 症状が実際に発生する状態
 
-**事後確認 (重要)**: 前回 eval (2026-07-12) の `soundpack-silent-with_skill` 出力自体に「ローカル 1.21.1 ブランチに調査対象 HEAD (b48caca) 未取り込みの修正コミット ede9d9c が存在し…」という記述があり、**前回 eval も worktree のベースとして `b48caca` を使っていたことが本人の報告文から確定した**。つまり今回選び直したベースコミットは、brief 記載の `ede9d9c~1` ではなく、前回 eval と完全に同一のコミットだった。比較可能性の懸念は解消。
+**事後確認 (重要)**: 前回 eval (2026-07-12) の `soundpack-silent-with_skill` 出力自体に「ローカル 1.21.1 ブランチに調査対象 HEAD (b48caca) 未取り込みの修正コミット ede9d9c が存在し…」という記述があり、**前回 eval も worktree のベースとして `b48caca` を使っていたことが本人の報告文から確定した**。つまり今回選び直したベースコミットは、brief 記載の `ede9d9c~1` ではなく、前回 eval と完全に同一のコミットだった。ベースコミットの一致という点では懸念解消。
 
 worktree 作成中に `.gradle` symlink を張った状態のまま `git worktree remove` を一度実行してしまいそうになったが、symlink を先に `rm` してから `remove` する正しい手順に修正した (最終的な作業には影響なし、実体の `.gradle` も無事)。
 
@@ -131,7 +131,7 @@ Task 2 で観測された「`--dir` 指定ミスは無診断 exit 0」の再現:
 ## 3. ツール観測まとめ (両 eval 横断)
 
 - `sig`/`bytecode`/`callers`/`apidiff` (= `resolve_class_entry` 系) は複数 jar マッチ時も自動で先頭マッチを使い通知するのみで、両 eval とも詰まらなかった。この系統は既に候補 A の挙動を実装済みで問題なし
-- `find`/`grep`/`read` (= `resolve_jar` 系) は、両 eval とも `find` で事前に候補 jar を確認してから `grep`/`read` に具体的な jar パターンを渡す使い方をしており、**`resolve_jar` の「複数マッチでエラー終了」自体には一度も到達しなかった**
+- `grep`/`read` が使う `resolve_jar` については、両 eval とも `find` で事前に候補 jar を確認してから `grep`/`read` に具体的な jar パターンを渡す使い方をしており、**`resolve_jar` の「複数マッチでエラー終了」自体には一度も到達しなかった**
 - 唯一のエラーは `grep` の引数誤用 (jar パターン欄にファイルパスを渡した) で、これは 0 件マッチのエラーであり複数マッチのエラーではない。エラーメッセージ自体は分かりやすく (`No source jar matching '...' found`)、エージェントは 1 手で `read` に切り替えて自己解決した。ツールの欠陥というより誤用に近く、対応は必須ではない
 - 両 eval とも「目的の jar/クラスが分からず全 jar を横断検索する」必要が生じる場面は無かった (`find` の全 jar 横断機能で十分事足りた)
 - ライセンス出力ルール (コード転載なし) について、両 eval で実際に違反が観測された。回帰 eval は ``` ブロックでの逐語コード転載 (LMML 自身のソース)、API eval はインラインコードでの逐語転載 (LMML 自身のソースおよび NeoForge の実ソース行を行番号付きで引用) だった。jar-search.sh 自体の問題ではなく、mc-research.md/SKILL.md の出力ルール記述 (```` ``` ```` ブロックのみを名指し) がインラインコードでの抜け道を塞げていない可能性がある。ただし前回 eval (バッククォート 0 個) との比較は出力チャネル・プロンプト・文章量が異なり交絡しているため、「統合作業による後退」と断定はできない (詳細は 1 節)。違反が観測された事実そのものは確定している
