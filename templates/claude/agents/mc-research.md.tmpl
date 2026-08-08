@@ -1,23 +1,6 @@
 ---
 name: mc-research
-description: "Use this agent for any read-only investigation of Minecraft, Architectury API, or prerequisite mod behavior — both (a) API research before implementing features or fixing bugs that depend on external API behavior, and (b) regression investigation after a Minecraft version migration (anything that worked before the port and is broken after it: \"1.21にしたら壊れた\", \"移植後に鳴らない/表示されない/動かない\", \"以前のバージョンでは正常だった\"). Launch this agent proactively before writing code that depends on Minecraft/Architectury API behavior, and before attempting any fix for a migration regression. This agent returns research findings (class names, method signatures, behavioral descriptions) or a root-cause report with a minimal fix proposal. It does not implement code.
-
-Examples:
-- user: \"AIにカスタムGoalを追加して\"
-  assistant: (needs to understand Goal system internals first)
-  <uses Agent tool with mc-research to research the Goal/AI system>
-
-- user: \"Architectury経由でパケットを送りたい\"
-  assistant: (needs to understand Architectury networking API)
-  <uses Agent tool with mc-research to investigate the networking API>
-
-- user: \"サウンドパックを選んでも声が鳴らなくなった。移植前は鳴ってた\"
-  assistant: (regression across migration — investigate root cause first)
-  <uses Agent tool with mc-research to investigate>
-
-- user: \"1.21.1にしたらGUIの描画がおかしい\"
-  assistant: (migration regression in rendering)
-  <uses Agent tool with mc-research to investigate>"
+description: "Use this agent for any read-only investigation of Minecraft, Architectury API, or prerequisite mod behavior — both (a) API research before implementing features or fixing bugs that depend on external API behavior, and (b) regression investigation after a Minecraft version migration (anything that worked before the port and is broken after it: \"1.21にしたら壊れた\", \"移植後に鳴らない/表示されない/動かない\", \"以前のバージョンでは正常だった\"). Launch this agent proactively before writing code that depends on Minecraft/Architectury API behavior, and before attempting any fix for a migration regression. This agent returns research findings (class names, method signatures, behavioral descriptions) or a root-cause report with a minimal fix proposal. It does not implement code.\n\nExamples:\n- user: \"AIにカスタムGoalを追加して\"\n  assistant: (needs to understand Goal system internals first)\n  <uses Agent tool with mc-research to research the Goal/AI system>\n\n- user: \"Architectury経由でパケットを送りたい\"\n  assistant: (needs to understand Architectury networking API)\n  <uses Agent tool with mc-research to investigate the networking API>\n\n- user: \"サウンドパックを選んでも声が鳴らなくなった。移植前は鳴ってた\"\n  assistant: (regression across migration — investigate root cause first)\n  <uses Agent tool with mc-research to investigate>\n\n- user: \"1.21.1にしたらGUIの描画がおかしい\"\n  assistant: (migration regression in rendering)\n  <uses Agent tool with mc-research to investigate>"
 tools: Bash, Glob, Grep, Read
 model: sonnet
 memory: local
