@@ -27,9 +27,11 @@ root-cause doc (`docs/research/2026-07-11_soundpack-regression-root-cause.md`) �
 
 **対応**: 「root-cause doc が無く、かつ回帰も既に発生している」最小差分のコミットとして `b48caca` (`4a1c875` の直前) を採用した。確認済み:
 - `git show b48caca:docs/research/2026-07-11_soundpack-regression-root-cause.md` → 存在しない (fatal: path exists on disk, but not in 'b48caca')
-- `git show b48caca:TODO.md` → 症状のみの TODO エントリ (`ce0a59b` 由来) は存在する。これは前回 eval (2026-07-12) の `soundpack-silent-with_skill` / `without_skill` 実行時の TODO.md 状態とも一致するはずで、比較可能性を保つ最小変更
+- `git show b48caca:TODO.md` → 症状のみの TODO エントリ (`ce0a59b` 由来) は存在する
 - `a2df84a` (回帰混入コミット) は `b48caca` の祖先 → 回帰は再現する
 - `LMSoundManager.java` の `getLocation()` override は `b48caca` 時点で既に無い (`new Sound(location, ...)` のみ) → 症状が実際に発生する状態
+
+**事後確認 (重要)**: 前回 eval (2026-07-12) の `soundpack-silent-with_skill` 出力自体に「ローカル 1.21.1 ブランチに調査対象 HEAD (b48caca) 未取り込みの修正コミット ede9d9c が存在し…」という記述があり、**前回 eval も worktree のベースとして `b48caca` を使っていたことが本人の報告文から確定した**。つまり今回選び直したベースコミットは、brief 記載の `ede9d9c~1` ではなく、前回 eval と完全に同一のコミットだった。比較可能性の懸念は解消。
 
 worktree 作成中に `.gradle` symlink を張った状態のまま `git worktree remove` を一度実行してしまいそうになったが、symlink を先に `rm` してから `remove` する正しい手順に修正した (最終的な作業には影響なし、実体の `.gradle` も無事)。
 
@@ -55,12 +57,14 @@ Root cause / 旧バージョンで動いていた理由 / (追加: なぜ今壊�
 
 ### ライセンス出力ルール (参考観察、brief は API eval にのみ要求だが実際に問題が見つかったため記録)
 
-**違反あり。** 報告中に、シグネチャを超えるロジックを含む ``` コードブロックが 2 箇所あった:
+**違反あり、かつ前回 eval からの後退と確認できた。** 報告中に、シグネチャを超えるロジックを含む ``` コードブロックが 2 箇所あった:
 
 1. 1.20 ブランチの override 実装をほぼそのまま再現 (コンストラクタ呼び出し全体 + `@Override` メソッド本体) して ``` ブロックで提示
 2. 現行 (1.21.1) の `addSound()` 内の `new Sound(...)` 呼び出しをそのまま ``` ブロックで提示
 
 どちらも「メソッド/フィールドのシグネチャのみ許可」のルールに反し、プロジェクトファイル (LMML 自身のソース) のコードを転載している。一方、javap のバイトコード出力 (`getstatic`/`invokevirtual` 等の逆アセンブル) はスキルの「報告」節が明示的に要求する根拠形式であり、これは問題ない。javap 出力の中に 1 箇所、`id.withPath("sounds/" + id.getPath() + ".ogg")` という Java 風の擬似コードで要約した行があり、これは実際の javap 出力そのものではなく「バイトコードが意味することを再構成した Java 表現」に見える — デコンパイル的な再構成であり、これも厳密にはルール抵触。
+
+**前回比較で確認した後退**: review HTML の `EMBEDDED_DATA.runs[*].outputs[*].content` を実際に取得して確認したところ、前回 (2026-07-12) の `soundpack-silent-with_skill` 出力はバッククォート (`` ` ``) の使用が **0 個**だった。今回の統合後エージェントは同じ root cause を報告しながら、コード転載を伴う ``` ブロックを新たに使うようになっている。これは jar-search.sh の変更ではなく、統合後の mc-research.md/SKILL.md の記述 (または統合の過程で失われた何らかの制約) がこの回帰の原因である可能性が高く、Task 6 の対象範囲外だが Task 7 で優先度をつけて扱うべき後退として記録する。
 
 ### 使用したコマンドと詰まった点 (サブエージェント報告より)
 
@@ -76,13 +80,15 @@ Root cause / 旧バージョンで動いていた理由 / (追加: なぜ今壊�
 
 **所要時間・トークン**: 319.8 秒 (about 5m20s)、tool_uses 29、subagent_tokens 80,107。
 
-**前回実測 (スキルあり Sonnet, 2026-07-12) との比較**: review HTML の `EMBEDDED_DATA.benchmark` は `runs: []` / `evals_run: []` で、**数値の所要時間・トークン記録は存在しなかった** (定性グレーディングの pass/fail のみ記録されていた)。したがって数値比較は不可能。定性面では、前回 with_skill 実行の 6 expectation (prefix/suffix 二重化の特定、override 削除の特定、ガスト声生存理由、正しい最小修正、jar による裏取り、worktree 無改変) のうち、削除コミットのハッシュ特定を除く 5 項目相当を今回も満たしている。Task 2 で単独計測された `callers Sound getLocation` の実測 82.6s と比べると、今回の 29 コマンド・約 320 秒というトータルは同オーダーで妥当な範囲。
+**前回実測 (スキルあり Sonnet, 2026-07-12) との比較**: review HTML の `EMBEDDED_DATA.benchmark` は `runs: []` / `evals_run: []` で、構造化された数値記録は存在しなかった。ただし出力本文 (`runs[*].outputs[*].content`) まで確認したところ、`soundpack-silent-without_skill` (スキルなしベースライン) の出力末尾に自己申告の所要時間「約19分 / 102kトークン / ツール呼び出し42回」があった (ただし jar-search.sh 不使用、fabric-loom キャッシュを手動展開する経路)。**`soundpack-silent-with_skill` (今回比較したい対象) 側には同様の自己申告が無く**、数値比較は今回もできない。定性面では、前回 with_skill 実行の 6 expectation (prefix/suffix 二重化の特定、override 削除の特定、ガスト声生存理由、正しい最小修正、jar による裏取り、worktree 無改変) のうち、削除コミットのハッシュ特定を除く 5 項目相当を今回も満たしている。Task 2 で単独計測された `callers Sound getLocation` の実測 82.6s と比べると、今回の 29 コマンド・約 320 秒というトータルは同オーダーで妥当な範囲。参考までに、スキルなしベースラインの ~19分/102kトークン/42回に対し、今回のスキルあり実行は 5.3分/80kトークン/29回とツール呼び出し回数・所要時間ともに少ない。
 
 ## 2. API eval: PlayerList.tracking のプラットフォーム差
 
 ### 調査依頼
 
 LMML `TODO.md` (中優先度、コミット `20cdc79` で追記) の実タスクをそのまま提示: 「`PlayerList.tracking` の実装がプラットフォームで食い違っている…」+ Fabric/NeoForge 双方の実際の API と呼び出し箇所の調査、NeoForge を tracker ベースに揃える場合の実装方針を依頼。作業ディレクトリは LMML 本体 (worktree ではなく main)。
+
+**方法論上の注記**: brief 指定通り `subagent_type: general-purpose` で起動しており、これは `Bash`/`Glob`/`Grep`/`Read` に加えて `Write`/`Edit` 等フルツールセットを持つ。実際の `mc-research` エージェント定義 (frontmatter `tools: Bash, Glob, Grep, Read`) が持つツール制限は、このハーネスではプロンプト遵守のみで担保されており機構的には強制されていない。今回は eval 実行後に `git -C .../LittleMaidModelLoader-Architectury status --short` で main リポジトリが清潔なまま (変更なし) であることを確認できたため実害は無かったが、read-only 制約の機構的強制そのものは本 eval の検証範囲外である。
 
 ### 結果: 調査質問に答えられたか → **Yes**
 
@@ -136,7 +142,7 @@ Task 2 で観測された「`--dir` 指定ミスは無診断 exit 0」の再現:
 
 | 候補 | 判定 | 根拠 |
 |---|---|---|
-| A: `resolve_jar` 複数マッチ自動選択 | **No** | 両 eval とも `resolve_jar` の複数マッチエラー (現状の「エラー終了」挙動) には一度も到達しなかった。エージェントは `find` の全 jar 横断結果を見てから `grep`/`read` に具体的なパターンを渡す運用で自然に回避していた。実装しても実害を防ぐ効果は観測上確認できていない (ただし将来別のタスクで起きうるリスク自体は否定できない) |
+| A: `resolve_jar` 複数マッチ自動選択 | **No** | 両 eval とも `resolve_jar` の複数マッチエラー (現状の「エラー終了」挙動) には一度も到達しなかった。ただし完全な無風ではない: API eval で `find ServerChunkManager` が Fabric 側 (Yarn マップ) の `minecraft-merged` jar 2 種 (ハッシュ違い) にヒットし、目的の NeoForge パッチ入り jar を得るために `grep`/`read` へ渡すパターンを `neoforge-21.1.233-minecraft-merged` まで具体化する一手間が発生した (ニアミス、`resolve_jar` のエラー分岐そのものには入っていない)。エージェントは `find` の結果を見てから長いパターンを渡す運用で自力回避しており、これが `resolve_jar` の「エラー終了」を実際にトリガーしたわけではない。実装しても実害を防ぐ効果が観測上確認できたとまでは言えない (将来別のタスクで起きうるリスク自体は否定できない) |
 | B: 横断 grep (`grepall`) | **No** | 両 eval とも「対象 jar が分からず全体を検索する」場面が発生しなかった。`find` によるクラス検索が事前情報として十分機能していた |
 
 **新規に観測された詰まり**:
