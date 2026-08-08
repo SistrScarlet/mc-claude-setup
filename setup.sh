@@ -282,9 +282,10 @@ create_directories() {
     ".claude/scripts"
     ".claude/skills/doc"
     ".claude/skills/release"
+    ".claude/skills/mc-research"
     ".claude/agents"
     ".claude/tools"
-    ".claude/agent-memory-local/mc-api-research"
+    ".claude/agent-memory-local/mc-research"
     "config/checkstyle"
     "config/spotbugs"
     "docs/adr"
@@ -310,6 +311,7 @@ copy_static_files() {
   copy_file "$TEMPLATES_DIR/claude/scripts/jar-search.sh" "$TARGET_DIR/.claude/scripts/jar-search.sh"
   copy_file "$TEMPLATES_DIR/claude/scripts/spotbugs-report.py" "$TARGET_DIR/.claude/scripts/spotbugs-report.py"
   copy_file "$TEMPLATES_DIR/claude/skills/doc/SKILL.md" "$TARGET_DIR/.claude/skills/doc/SKILL.md"
+  copy_file "$TEMPLATES_DIR/claude/skills/mc-research/SKILL.md" "$TARGET_DIR/.claude/skills/mc-research/SKILL.md"
   copy_file "$TEMPLATES_DIR/config/checkstyle/checkstyle.xml" "$TARGET_DIR/config/checkstyle/checkstyle.xml"
   copy_file "$TEMPLATES_DIR/config/spotbugs/exclude.xml" "$TARGET_DIR/config/spotbugs/exclude.xml"
 
@@ -330,21 +332,57 @@ process_templates() {
     "$TARGET_DIR/.claude/skills/release/SKILL.md"
 
   process_template \
-    "$TEMPLATES_DIR/claude/agents/mc-api-research.md.tmpl" \
-    "$TARGET_DIR/.claude/agents/mc-api-research.md"
+    "$TEMPLATES_DIR/claude/agents/mc-research.md.tmpl" \
+    "$TARGET_DIR/.claude/agents/mc-research.md"
 }
 
 # エージェントメモリの初期化
 init_agent_memory() {
-  local memory_file="$TARGET_DIR/.claude/agent-memory-local/mc-api-research/MEMORY.md"
+  local memory_file="$TARGET_DIR/.claude/agent-memory-local/mc-research/MEMORY.md"
   if [ ! -f "$memory_file" ]; then
     if [ "$DRY_RUN" = true ]; then
       echo "  [dry-run] $memory_file (empty MEMORY.md)"
     else
-      echo "# MC API Research Memory" > "$memory_file"
+      echo "# MC Research Memory" > "$memory_file"
       echo "" >> "$memory_file"
       echo "<!-- This file persists across conversations. Keep under 200 lines. -->" >> "$memory_file"
       echo "  ${memory_file#$TARGET_DIR/} (initialized)"
+    fi
+  fi
+}
+
+# 旧調査エージェント構成 (mc-api-research / regression-research) からの移行
+# 2026-08-08 の mc-research 統合に伴う後方互換処理。旧構成が無ければ何もしない。
+migrate_legacy_research_files() {
+  local legacy_files=(
+    ".claude/agents/mc-api-research.md"
+    ".claude/agents/regression-research.md"
+    ".claude/skills/regression-research/SKILL.md"
+  )
+  local f
+  for f in "${legacy_files[@]}"; do
+    if [ -f "$TARGET_DIR/$f" ]; then
+      if [ "$DRY_RUN" = true ]; then
+        echo "  [dry-run] remove $f (mc-research に統合)"
+      else
+        rm "$TARGET_DIR/$f"
+        echo "  $f (removed: mc-research に統合)"
+      fi
+    fi
+  done
+  # スキルディレクトリは空の場合のみ削除 (ユーザーの独自ファイルを消さない)
+  if [ -d "$TARGET_DIR/.claude/skills/regression-research" ] && [ "$DRY_RUN" != true ]; then
+    rmdir "$TARGET_DIR/.claude/skills/regression-research" 2>/dev/null || true
+  fi
+  # エージェントメモリの引き継ぎ (旧ディレクトリを改名。移行済みなら何もしない)
+  local old_mem="$TARGET_DIR/.claude/agent-memory-local/mc-api-research"
+  local new_mem="$TARGET_DIR/.claude/agent-memory-local/mc-research"
+  if [ -d "$old_mem" ] && [ ! -d "$new_mem" ]; then
+    if [ "$DRY_RUN" = true ]; then
+      echo "  [dry-run] mv .claude/agent-memory-local/{mc-api-research -> mc-research}"
+    else
+      mv "$old_mem" "$new_mem"
+      echo "  .claude/agent-memory-local/{mc-api-research -> mc-research} (memory 引き継ぎ)"
     fi
   fi
 }
@@ -578,6 +616,7 @@ run_diff() {
     "claude/scripts/jar-search.sh:.claude/scripts/jar-search.sh"
     "claude/scripts/spotbugs-report.py:.claude/scripts/spotbugs-report.py"
     "claude/skills/doc/SKILL.md:.claude/skills/doc/SKILL.md"
+    "claude/skills/mc-research/SKILL.md:.claude/skills/mc-research/SKILL.md"
     "config/checkstyle/checkstyle.xml:config/checkstyle/checkstyle.xml"
     "config/spotbugs/exclude.xml:config/spotbugs/exclude.xml"
   )
@@ -608,7 +647,7 @@ run_diff() {
   # テンプレートファイルの比較（変数置換後）
   local template_files=(
     "claude/skills/release/SKILL.md.tmpl:.claude/skills/release/SKILL.md"
-    "claude/agents/mc-api-research.md.tmpl:.claude/agents/mc-api-research.md"
+    "claude/agents/mc-research.md.tmpl:.claude/agents/mc-research.md"
   )
 
   echo ""
@@ -758,6 +797,7 @@ main() {
     exit 0
   fi
 
+  migrate_legacy_research_files
   create_directories
   copy_static_files
   process_templates
